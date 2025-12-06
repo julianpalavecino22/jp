@@ -1,132 +1,160 @@
-class juego {
+class Juego {
   constructor() {
-    this.fondo = imgFondo[int(random(1, 3))];
-    this.crearPersonaje();
-    this.crearObstaculos();
-    this.crearMonedas();
-    this.puntos = 0; // contador de monedas
+  
+    this.personaje = new Personaje(); 
+    this.enemigosGenerados = false; 
+    this.posicionesX = [40, 160, 280, 400, 520, 640];  
+    this.posicionY = 30; 
+    this.enemigosMuertos = 0; 
+    this.descensoActivo = false;  
+    this.velDescenso = 0.1; 
+    this.filasDeEnemigos = [];  
+    this.cantidadEnemigos = 0; 
   }
-  dibujar() {
-    // Fondo
-    image(this.fondo, 0, 0, width, height);
 
-    // personaje
-    this.personaje.dibujar();
-
-    // obstaculos
-    for (let i = 0; i < 2; i++) {
-      if (this.obstaculos[i]) {
-        this.obstaculos[i].actualizar(); // se mueve hacia abajo
-        this.obstaculos[i].dibujar();
-
-        // 💥 Colisión con obstáculo
-        let d = dist(
-          this.personaje.posX,
-          this.personaje.posY,
-          this.obstaculos[i].posX,
-          this.obstaculos[i].posY );
-      }
-    }
-
-    // monedas
-    for (let i = 0; i < 5; i++) {
-      if (this.monedas[i]) {
-        this.monedas[i].actualizar(); // se mueven hacia abajo
-        this.monedas[i].dibujar();
-
-        // Colisión con moneda
-        let d = dist(
-          this.personaje.posX,
-          this.personaje.posY,
-          this.monedas[i].posX,
-          this.monedas[i].posY );
-        if (d < 40) {
-          // reposicionar moneda arriba
-          //this.monedas[i].posY = random(-400, -50);
-         // this.monedas[i].posX = random(100, width - 100);
-         // this.puntos += 1; // suma 1 punto
+ activarDescenso() {
+    if (this.enemigosMuertos > 3) {
+      this.descensoActivo = true;  
+      for (let fila of this.filasDeEnemigos) {
+        for (let enemigo of fila) {
+          if (enemigo.estaVivo()) {
+            enemigo.posY += this.velDescenso; 
+          }
         }
       }
     }
-    // Mostrar puntos
-    fill(0);
-    textSize(20);
-    text("Puntos: " + this.puntos, 480, 20);
   }
 
-  crearObstaculos() {
-    this.obstaculos = [];
-    for (let i = 0; i < 3; i++) {
-      this.obstaculos[i] = new obstaculo(i);
+  aumentoVelocidadDescenso() {
+      if (this.enemigosMuertos > 3 && (this.enemigosMuertos - 3) % 2 === 0) {
+      this.velDescenso += 0.001;  
+    }
+  }
+ 
+  incrementarVelocidad() {
+    if (this.enemigosMuertos > 6 && (this.enemigosMuertos % 2 === 0)) {
+      for (let fila of this.filasDeEnemigos) {
+        for (let enemigo of fila) {
+          enemigo.velocidad += 0.01;  
+        }
+      }
     }
   }
 
-  crearMonedas() {
-    this.monedas = [];
-    for (let i = 0; i < 6; i++) {
-      this.monedas[i] = new moneda();
+  dibujar() {
+    this.personaje.dibujar(); 
+    this.incrementarVelocidad() ;
+    this.activarDescenso();
+    this.incrementarVelocidad();
+    this.crearNuevasFilas();  
+    this.aumentoVelocidadDescenso();
+
+    for (let fila of this.filasDeEnemigos) {
+      for (let enemigo of fila) {
+        enemigo.dibujar();
+        enemigo.mover();
+      }
+    }
+
+    for (let i = 0; i < this.personaje.balas.length; i++) {
+      this.personaje.balas[i].mover();
+      this.personaje.balas[i].dibujar();
+
+      if (this.personaje.balas[i].fueraDePantalla()) {
+        this.personaje.balas[i].matar(); 
+      }
+
+      for (let j = 0; j < this.filasDeEnemigos.length; j++) {
+        for (let k = 0; k < this.filasDeEnemigos[j].length; k++) {
+          let enemigo = this.filasDeEnemigos[j][k];
+          
+          if (enemigo.estaVivo() && enemigo.colisionConBala(this.personaje.balas[i]) && this.personaje.balas[i].activa()) {
+            enemigo.matar();  
+            this.personaje.balas[i].matar();  
+            this.enemigosMuertos++;  
+            this.cantidadEnemigos--;  
+            break;  
+          }
+        }
+        if (!this.personaje.balas[i].activa()) {
+          break;
+        }
+      }
+    }
+   
+    for (let i = 0; i < this.filasDeEnemigos.length; i++) {
+      this.filasDeEnemigos[i] = this.filasDeEnemigos[i].filter(enemigo => enemigo.estaVivo() && !enemigo.fueraDePantalla());
+    }
+
+    if (!this.enemigosGenerados) {
+      this.crearFilaDeEnemigos();  
+      this.enemigosGenerados = true;  
+    }
+
+    if (this.enemigosMuertos === 36) {
+      return "gano";  
+    }
+   
+    
+    for (let fila of this.filasDeEnemigos) {
+      for (let enemigo of fila) {
+        if (enemigo.estaVivo() && enemigo.posY >= height) {
+          return "perdio";  
+        }
+      }
+    }
+    return "jugando";  
+  }
+  
+    teclaPresionada(keyCode) { 
+    if (keyCode === 32) {  
+      this.personaje.disparar();
+      disparo.play();
     }
   }
 
-  crearPersonaje() {
-    this.personaje = new personaje();
+  getTotalEnemigos() {
+    return this.cantidadEnemigos;
   }
 
-  teclaPresionada(keyCode) {
-   this.personaje.teclaPresionada(keyCode);
+  crearFilaDeEnemigos() {
+    let fila = [];
+    for (let i = 0; i < this.posicionesX.length; i++) {
+      let x = this.posicionesX[i];
+      let y = this.posicionY;
+      let enemigo = new Enemigo(x, y);
+      fila.push(enemigo);
+      this.cantidadEnemigos++;  
+    }
+    this.filasDeEnemigos.push(fila);
+  }
+
+  crearNuevasFilas() {
+    let fila1 = [], fila2 = [], fila3 = [], fila4 = [], fila5 = [];
+     if (this.enemigosMuertos >= 3 && this.filasDeEnemigos.length === 1) {
+    for (let i = 0; i < this.posicionesX.length; i++) {
+      fila1.push(new Enemigo(this.posicionesX[i], -50));
+      fila2.push(new Enemigo(this.posicionesX[i] + 50, -150));
+      fila3.push(new Enemigo(this.posicionesX[i], -250));
+      fila4.push(new Enemigo(this.posicionesX[i] + 50, -350));
+      fila5.push(new Enemigo(this.posicionesX[i], -450));
+      this.cantidadEnemigos += 5;  
+    }
+
+    this.filasDeEnemigos.push(fila1, fila2, fila3, fila4, fila5);
+    this.descensoActivo = true;
   }
 }
 
-//  dibujar () {
-//    image(this.fondo, 0, 0, width, height);
-//    this.personaje.dibujar();
-
-//    // Dibuja obstáculos
-//    for (let i = 0; i < 10; i++) {
-//      if (this.obstaculos[i]) {
-//        this.obstaculos[i].dibujar();
-//      }
-//    }
-
-//    // Dibuja monedas
-//    for (let i = 0; i < 10; i++) {
-//      if (this.monedas[i]) {
-//        this.monedas[i].dibujar();
-//      }
-//    }
-//  }
-
-
-//  iniciar() {
-//  }
-//  crearObstaculos() {
-//  this.obstaculos = [];
-
-//  // Punto base de donde empieza la fila de arboles
-//let baseX = random(270, 285);  // centrado horizontalmente
-// let baseY = random(350, 220); // vertical (parte baja visible)
-
-//  for (let i = 0; i < 2; i++) { // cuántos arboles hay en la  fila
-//    this.obstaculos[i] = new obstaculo(i, baseX, baseY);
-//    //this.obstaculos = [];
-//    //for (let i = 0; i < 4; i++) {
-//    //  this.obstaculos[i] = new obstaculo();
-//   }
-//  }
-//  crearMonedas() {
-//    this.monedas = [];
-//    for (let i = 0; i < 5; i++) {
-//      this.monedas[i] = new moneda();
-//    }
-//  }
-
-//  crearPersonaje() {
-//    this.personaje = new personaje();
-//  }
-//  personajeGano() {
-//  }
-
-//  teclaPresionada(keyCode) {
-//    this.personaje.teclaPresionada(keyCode);
-//  }
-//}
+ reiniciarJuego() {
+    this.enemigos = [];
+    this.personaje = new Personaje();
+    this.enemigosMuertos = 0;
+    this.descensoActivo = false;
+    this.velDescenso = 0.1;
+    this.filasDeEnemigos = [];
+    this.cantidadEnemigos = 0;
+    this.enemigosGenerados = false;
+    this.crearNuevasFilas();  
+    }
+}
